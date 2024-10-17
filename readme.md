@@ -1,0 +1,2 @@
+Lembrete is an anki clone that is being developed as a part of Contemporary Problem Analysis course of University of Bolton.
+It is being written in Go, and it utilizes (or will utilize) SQLite and Fyne.
