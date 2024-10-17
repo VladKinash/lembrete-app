@@ -2,7 +2,7 @@ package algorithm
 
 import (
 	//"ftm"
-	f "CLIanki/flashcard"
+	f "Lembrete/flashcard"
 	"errors"
 	"math"
 )
