@@ -4,7 +4,7 @@ type Flashcard struct {
 	Front       string
 	Back        string
 	EaseFactor  float32
-	Repetitions int // Changed to exported
+	Repetitions int 
 	Interval    float32
 	NextReview  string
 }
