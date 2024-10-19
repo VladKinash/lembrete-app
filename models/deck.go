@@ -7,7 +7,7 @@ type Deck struct {
 	Id              int32
 }
 
-func newDeck(MaxNewCards int32, MaxReviewsDaily int32, Name string, Id int32) Deck {
+func NewDeck(MaxNewCards int32, MaxReviewsDaily int32, Name string, Id int32) Deck {
 	return Deck{
 
 		MaxNewCards:     MaxNewCards,
