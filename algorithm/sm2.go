@@ -2,7 +2,7 @@ package algorithm
 
 import (
 	//"ftm"
-	f "Lembrete/flashcard"
+	f "Lembrete/models"
 	"errors"
 	"math"
 )
