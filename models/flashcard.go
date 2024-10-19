@@ -8,7 +8,7 @@ type Flashcard struct {
 	Interval    float32
 	NextReview  string
 	DeckID      string
-	CardId      string
+	Id          int32
 }
 
 func NewFlashcard(
@@ -19,7 +19,7 @@ func NewFlashcard(
 	interval float32,
 	nextReview string,
 	DeckID string,
-	CardId string,
+	Id int32,
 ) Flashcard {
 	return Flashcard{
 		Front:       front,
@@ -29,6 +29,6 @@ func NewFlashcard(
 		Interval:    interval,
 		NextReview:  nextReview,
 		DeckID:      DeckID,
-		CardId:      CardId,
+		Id:          Id,
 	}
 }

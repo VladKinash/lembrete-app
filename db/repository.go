@@ -3,7 +3,6 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -27,21 +26,17 @@ func createTableDeck(db *sql.DB) error {
 
 func createTableCard(db *sql.DB) error {
 
-	createTableQuery := `CREATE TABLE IF NOT EXISTS Deck (
+	createTableQuery := `CREATE TABLE IF NOT EXISTS Flashcards (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT,
-		MaxNewCards INTEGER,
-		MaxReviewsDaily INTEGER
+		Front TEXT,
+		Back TEXT,
+		EaseFactor REAL,
+		Repetitions INTEGER,
+		Interval REAL,
+		NextReview TEXT,
+		DeckID INTEGER,
+		FOREIGN KEY (DeckID) REFERENCES Decks(id)
 	);`
-
-	/*	front string,
-		back string,
-		easeFactor float32,
-		repetitions int,
-		interval float32,
-		nextReview string,
-		DeckID string,
-		CardId string,*/
 
 	_, err := db.Exec(createTableQuery)
 
