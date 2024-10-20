@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 
-	//"log"
 	_ "modernc.org/sqlite"
 )
 

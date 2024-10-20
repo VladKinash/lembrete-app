@@ -15,6 +15,8 @@ func main() {
 		fmt.Println("error fetching decks: ", err)
 	}
 	defer db.Close()
+	
+
 	decks, err := repo.FetchAllDecks(db)
 	if err != nil {
 		log.Fatal(err)
