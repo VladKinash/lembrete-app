@@ -4,14 +4,14 @@ type Deck struct {
 	MaxNewCards     int32
 	MaxReviewsDaily int32
 	Name            string
-	Id              int32
+	ID              int32
 }
 
-func NewDeck(MaxNewCards int32, MaxReviewsDaily int32, Name string, Id int32) Deck {
+func NewDeck(MaxNewCards int32, MaxReviewsDaily int32, Name string, ID int32) Deck {
 	return Deck{
 
 		MaxNewCards:     MaxNewCards,
 		MaxReviewsDaily: MaxReviewsDaily,
 		Name:            Name,
-		Id:              Id}
+		ID:              ID}
 }
