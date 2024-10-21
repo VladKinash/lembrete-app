@@ -17,10 +17,10 @@ func main() {
 	defer db.Close()
 	
 
-	decks, err := repo.FetchAllDecks(db)
+	cards, err := repo.FetchAllCards(db, 1)
 	if err != nil {
 		log.Fatal(err)
 	}
-	repo.DisplayArrDecks(decks)
+	repo.DisplayArrCards(cards)
 
 }

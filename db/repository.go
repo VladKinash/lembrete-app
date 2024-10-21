@@ -1,16 +1,15 @@
 package repository
 
 import (
-	m "Lembrete/models"
+	models "Lembrete/models" // Use a descriptive alias
 	"database/sql"
 	"fmt"
-	"strconv"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
 
 func CreateTableDeck(db *sql.DB) error {
-
 	createTableQuery := `CREATE TABLE IF NOT EXISTS Decks (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT,
@@ -19,16 +18,13 @@ func CreateTableDeck(db *sql.DB) error {
 	);`
 
 	_, err := db.Exec(createTableQuery)
-
 	if err != nil {
-		return fmt.Errorf("failed to create table: %v", err)
+		return fmt.Errorf("failed to create Decks table: %v", err)
 	}
-
 	return nil
 }
 
 func CreateTableCard(db *sql.DB) error {
-
 	createTableQuery := `CREATE TABLE IF NOT EXISTS Cards (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		Front TEXT,
@@ -42,11 +38,9 @@ func CreateTableCard(db *sql.DB) error {
 	);`
 
 	_, err := db.Exec(createTableQuery)
-
 	if err != nil {
-		return fmt.Errorf("failed to create table: %v", err)
+		return fmt.Errorf("failed to create Cards table: %v", err)
 	}
-
 	return nil
 }
 
@@ -54,7 +48,7 @@ func OpenDB(dbName string) (*sql.DB, error) {
 	dbName = "./" + dbName + ".db"
 	database, err := sql.Open("sqlite", dbName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open or create database %w", err)
+		return nil, fmt.Errorf("failed to open or create database: %w", err)
 	}
 	if err = database.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to connect to the database: %v", err)
@@ -62,117 +56,116 @@ func OpenDB(dbName string) (*sql.DB, error) {
 	return database, nil
 }
 
-func InsertCard(db *sql.DB, card m.Flashcard) error {
+func InsertCard(db *sql.DB, card models.Flashcard) error {
 	if db == nil {
 		return fmt.Errorf("database connection is nil")
 	}
 
 	insertQuery := "INSERT INTO Cards (Front, Back, EaseFactor, Repetitions, Interval, NextReview, DeckID) VALUES (?, ?, ?, ?, ?, ?, ?)"
-
 	_, err := db.Exec(insertQuery, card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to insert card: %v", err)
 	}
+
 	fmt.Println("Inserted card:", card.Front)
 	return nil
 }
 
-func InsertDeck(db *sql.DB, deck m.Deck) error {
+func InsertDeck(db *sql.DB, deck models.Deck) error {
 	if db == nil {
 		return fmt.Errorf("database connection is nil")
 	}
 
-	insertQuery := "INSERT INTO decks (MaxNewCards, MaxReviewsDaily, Name) VALUES (?, ?, ?)"
-
+	insertQuery := "INSERT INTO Decks (MaxNewCards, MaxReviewsDaily, Name) VALUES (?, ?, ?)"
 	_, err := db.Exec(insertQuery, deck.MaxNewCards, deck.MaxReviewsDaily, deck.Name)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to insert deck: %v", err)
 	}
 
-	fmt.Println("Inserted deck", deck.Name)
+	fmt.Println("Inserted deck:", deck.Name)
 	return nil
 }
 
-func FetchAllCards(db *sql.DB, deckId int32) ([]m.Flashcard, error) {
-	var cards []m.Flashcard
-	rows, err := db.Query("SELECT * FROM Cards WHERE DeckID= ?", strconv.Itoa(int(deckId)))
+func FetchAllCards(db *sql.DB, deckID int32) ([]models.Flashcard, error) {
+	var cards []models.Flashcard
+	rows, err := db.Query("SELECT * FROM Cards WHERE DeckID = ?", deckID)
 	if err != nil {
-		return nil, fmt.Errorf("the query that selects all cards has failed")
+		return nil, fmt.Errorf("failed to select cards for deck %d: %v", deckID, err)
 	}
 	defer rows.Close()
 
+	var nextReviewStr string
 	for rows.Next() {
-		var card m.Flashcard
+		var card models.Flashcard
 		if err := rows.Scan(
-			&card.Id,
+			&card.ID,
 			&card.Front,
 			&card.Back,
 			&card.EaseFactor,
 			&card.Repetitions,
 			&card.Interval,
-			&card.NextReview,
+			&nextReviewStr,
 			&card.DeckID); err != nil {
-			return nil, fmt.Errorf("failed to scan rows of the card")
+			return nil, fmt.Errorf("failed to scan card row: %v", err)
+		}
+		card.NextReview, err = time.Parse("2006-01-02", nextReviewStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse NextReview date: %v", err)
 		}
 		cards = append(cards, card)
 	}
+
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("there was an error when iterating over the rows: %v", err)
+		return nil, fmt.Errorf("error occurred while iterating over rows: %v", err)
 	}
-	if len(cards) == 0 {
-		return nil, fmt.Errorf("the list of decks is empty")
-	}
+
 	return cards, nil
 }
 
-func FetchAllDecks(db *sql.DB) ([]m.Deck, error) {
-
-	var Decks []m.Deck
+func FetchAllDecks(db *sql.DB) ([]models.Deck, error) {
+	var decks []models.Deck
 	rows, err := db.Query("SELECT * FROM Decks")
 	if err != nil {
-		return nil, fmt.Errorf("the query that was to select all decks has failed: %v", err)
+		return nil, fmt.Errorf("failed to select all decks: %v", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var deck m.Deck
+		var deck models.Deck
 		if err := rows.Scan(
-			&deck.Id,
+			&deck.ID,
 			&deck.Name,
 			&deck.MaxNewCards,
-			&deck.MaxReviewsDaily,
-		); err != nil {
-			return nil, fmt.Errorf("there was an error when scanning the decks: %v", err)
+			&deck.MaxReviewsDaily); err != nil {
+			return nil, fmt.Errorf("failed to scan deck row: %v", err)
 		}
-		Decks = append(Decks, deck)
+		decks = append(decks, deck)
 	}
+
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("there was an error when iterating over rows")
+		return nil, fmt.Errorf("error occurred while iterating over rows: %v", err)
 	}
-	if len(Decks) == 0 {
-		return nil, fmt.Errorf("the list of decks is empty")
-	}
-	return Decks, nil
+
+	return decks, nil
 }
 
-func DisplayArrDecks(decks []m.Deck) error {
+func DisplayArrDecks(decks []models.Deck) error {
 	for _, deck := range decks {
 		fmt.Printf("Deck ID: %d, Name: %s, Max New Cards: %d, Max Reviews Daily: %d\n",
-			deck.Id, deck.Name, deck.MaxNewCards, deck.MaxReviewsDaily)
+			deck.ID, deck.Name, deck.MaxNewCards, deck.MaxReviewsDaily)
 	}
 	return nil
 }
 
-func DisplayArrCards(cards []m.Flashcard) error {
+func DisplayArrCards(cards []models.Flashcard) error {
 	for _, card := range cards {
 		fmt.Printf("Card ID: %d, Front: %s, Back: %s, Ease Factor: %.2f, Repetitions: %d, Interval: %.2f, Next Review: %s, Deck ID: %s\n",
-			card.Id, card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID)
+			card.ID, card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID)
 	}
 	return nil
 }
 
-func UpdateCardRecords(db *sql.DB, cards []m.Flashcard) error {
-
+func UpdateCardRecords(db *sql.DB, cards []models.Flashcard) error {
 	stmt, err := db.Prepare(`
 	UPDATE Cards 
 	SET Front = ?, 
@@ -185,21 +178,21 @@ func UpdateCardRecords(db *sql.DB, cards []m.Flashcard) error {
 	WHERE ID = ?
 	`)
 	if err != nil {
-		return fmt.Errorf("there ws an error when preparing the statement to update card records: %v", err)
+		return fmt.Errorf("failed to prepare card update statement: %v", err)
 	}
 	defer stmt.Close()
 
 	for _, card := range cards {
-		_, err = stmt.Exec(card.Id, card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID)
+		_, err = stmt.Exec(card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID, card.ID)
 		if err != nil {
-			return fmt.Errorf("there was an error when executing the statement: %v", err)
+			return fmt.Errorf("failed to execute card update statement: %v", err)
 		}
 	}
 
 	return nil
 }
 
-func UpdateDeckRecords(db *sql.DB, decks []m.Deck) error {
+func UpdateDeckRecords(db *sql.DB, decks []models.Deck) error {
 	stmt, err := db.Prepare(`
         UPDATE Decks 
         SET name = ?, 
@@ -208,14 +201,14 @@ func UpdateDeckRecords(db *sql.DB, decks []m.Deck) error {
         WHERE id = ?
     `)
 	if err != nil {
-		return fmt.Errorf("there was an error when preparing the statement to update deck records: %v", err)
+		return fmt.Errorf("failed to prepare deck update statement: %v", err)
 	}
 	defer stmt.Close()
 
 	for _, deck := range decks {
-		_, err = stmt.Exec(deck.Name, deck.MaxNewCards, deck.MaxReviewsDaily, deck.Id)
+		_, err = stmt.Exec(deck.Name, deck.MaxNewCards, deck.MaxReviewsDaily, deck.ID)
 		if err != nil {
-			return fmt.Errorf("there was an error when executing the statement: %v", err)
+			return fmt.Errorf("failed to execute deck update statement: %v", err)
 		}
 	}
 
