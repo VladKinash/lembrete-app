@@ -9,7 +9,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-
 func InsertCard(db *sql.DB, card models.Flashcard) error {
 	if db == nil {
 		return fmt.Errorf("database connection is nil")
@@ -94,6 +93,7 @@ func FetchAllDecks(db *sql.DB) ([]models.Deck, error) {
 			return nil, fmt.Errorf("failed to scan deck row: %v", err)
 		}
 		decks = append(decks, deck)
+
 	}
 
 	if err := rows.Err(); err != nil {
@@ -101,6 +101,70 @@ func FetchAllDecks(db *sql.DB) ([]models.Deck, error) {
 	}
 
 	return decks, nil
+}
+
+func FetchDeck(db *sql.DB, deckID int) (models.Deck, error) {
+
+	var deck models.Deck
+
+	var query, err = db.Query(`SELECT ID, Name, MaxNewCards, MaxReviewsDaily FROM Decks WHERE ID = ? LIMIT 1`, deckID)
+	if err != nil {
+		return deck, fmt.Errorf("there was an error when preparing FetchDeck query: %v", err)
+	}
+	defer query.Close()
+
+	for query.Next() {
+		if err := query.Scan(
+			&deck.ID,
+			&deck.Name,
+			&deck.MaxNewCards,
+			&deck.MaxReviewsDaily); err != nil {
+			return deck, fmt.Errorf("failed to scan deck row: %v", err)
+		}
+	}
+
+	if err := query.Err(); err != nil {
+		return deck, fmt.Errorf("there was an error in query: %v", err)
+	}
+
+	return deck, nil
+}
+
+func FetchCard(db *sql.DB, cardID int) (models.Flashcard, error){
+	var card models.Flashcard
+	query, err := db.Query(`SELECT * FROM CARDS WHERE ID = ? LIMIT 1`, cardID)
+
+	if err != nil{
+		return card, fmt.Errorf("there was an error in query of fetchard: %v", err)
+	}
+
+	defer query.Close()
+
+	var nextReviewStr string
+	for query.Next() {
+		if err := query.Scan(
+			&card.ID,
+			&card.Front,
+			&card.Back,
+			&card.EaseFactor,
+			&card.Repetitions,
+			&card.Interval,
+			&nextReviewStr,
+			&card.DeckID); err != nil {
+			return card, fmt.Errorf("failed to scan card row: %v", err)
+		}
+		card.NextReview, err = time.Parse("2006-01-02", nextReviewStr)
+		if err != nil {
+			return card, fmt.Errorf("failed to parse NextReview date: %v", err)
+		}
+
+		if err := query.Err(); err != nil{
+			return card, fmt.Errorf("there was an error during iteration: %v", err)
+		}
+	}
+
+
+	return card , nil
 }
 
 func DisplayArrDecks(decks []models.Deck) error {

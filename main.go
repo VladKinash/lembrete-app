@@ -3,7 +3,7 @@ package main
 import (
 	repo "Lembrete/db"
 	"fmt"
-	"log"
+	//"log"
 )
 
 func main() {
@@ -15,10 +15,9 @@ func main() {
 	defer db.Close()
 	
 
-	cards, err := repo.FetchAllCards(db, 1)
-	if err != nil {
-		log.Fatal(err)
-	}
-	repo.DisplayArrCards(cards)
+	card, err := repo.FetchCard(db, 1)
+
+	fmt.Println(card)
+	fmt.Println(err)
 
 }
