@@ -1,10 +1,14 @@
 package repository
+
 import (
+	models "Lembrete/models"
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
+
 func CreateTableDeck(db *sql.DB) error {
 	createTableQuery := `CREATE TABLE IF NOT EXISTS Decks (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,4 +54,40 @@ func OpenDB(dbName string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to connect to the database: %v", err)
 	}
 	return database, nil
+}
+
+func scanDeckRow(row *sql.Rows) (models.Deck, error) {
+	var deck models.Deck
+	if err := row.Scan(
+		&deck.ID,
+		&deck.Name,
+		&deck.MaxNewCards,
+		&deck.MaxReviewsDaily); err != nil {
+		return deck, fmt.Errorf("failed to scan deck row: %v", err)
+	}
+	return deck, nil
+}
+
+func scanFlashcardRow(row *sql.Rows) (models.Flashcard, error) {
+	var card models.Flashcard
+	var nextReviewStr string
+
+	if err := row.Scan(
+		&card.ID,
+		&card.Front,
+		&card.Back,
+		&card.EaseFactor,
+		&card.Repetitions,
+		&card.Interval,
+		&nextReviewStr,
+		&card.DeckID); err != nil {
+		return card, fmt.Errorf("failed to scan card row: %v", err)
+	}
+	convReview, err := time.Parse("2006-01-02", nextReviewStr)
+	card.NextReview = convReview
+	if err != nil {
+		return card, fmt.Errorf("failed to parse NextReview date: %v", err)
+	}
+
+	return card, nil
 }
