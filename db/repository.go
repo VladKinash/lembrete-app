@@ -4,7 +4,6 @@ import (
 	models "Lembrete/models"
 	"database/sql"
 	"fmt"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -47,23 +46,11 @@ func FetchAllCards(db *sql.DB, deckID int32) ([]models.Flashcard, error) {
 	}
 	defer rows.Close()
 
-	var nextReviewStr string
 	for rows.Next() {
 		var card models.Flashcard
-		if err := rows.Scan(
-			&card.ID,
-			&card.Front,
-			&card.Back,
-			&card.EaseFactor,
-			&card.Repetitions,
-			&card.Interval,
-			&nextReviewStr,
-			&card.DeckID); err != nil {
-			return nil, fmt.Errorf("failed to scan card row: %v", err)
-		}
-		card.NextReview, err = time.Parse("2006-01-02", nextReviewStr)
+		card, err := scanFlashcardRow(rows)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse NextReview date: %v", err)
+			return cards, fmt.Errorf("something went wrong when scanning the cards")
 		}
 		cards = append(cards, card)
 	}
@@ -84,16 +71,12 @@ func FetchAllDecks(db *sql.DB) ([]models.Deck, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var deck models.Deck
-		if err := rows.Scan(
-			&deck.ID,
-			&deck.Name,
-			&deck.MaxNewCards,
-			&deck.MaxReviewsDaily); err != nil {
-			return nil, fmt.Errorf("failed to scan deck row: %v", err)
+		var card models.Deck
+		card, err := scanDeckRow(rows)
+		if err != nil {
+			return decks, fmt.Errorf("something went wrong when scanning the decks")
 		}
-		decks = append(decks, deck)
-
+		decks = append(decks, card)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -104,9 +87,7 @@ func FetchAllDecks(db *sql.DB) ([]models.Deck, error) {
 }
 
 func FetchDeck(db *sql.DB, deckID int) (models.Deck, error) {
-
 	var deck models.Deck
-
 	var query, err = db.Query(`SELECT ID, Name, MaxNewCards, MaxReviewsDaily FROM Decks WHERE ID = ? LIMIT 1`, deckID)
 	if err != nil {
 		return deck, fmt.Errorf("there was an error when preparing FetchDeck query: %v", err)
@@ -114,57 +95,26 @@ func FetchDeck(db *sql.DB, deckID int) (models.Deck, error) {
 	defer query.Close()
 
 	for query.Next() {
-		if err := query.Scan(
-			&deck.ID,
-			&deck.Name,
-			&deck.MaxNewCards,
-			&deck.MaxReviewsDaily); err != nil {
-			return deck, fmt.Errorf("failed to scan deck row: %v", err)
-		}
+		return scanDeckRow(query)
 	}
 
-	if err := query.Err(); err != nil {
-		return deck, fmt.Errorf("there was an error in query: %v", err)
-	}
-
-	return deck, nil
+	return models.Deck{}, fmt.Errorf("no deck found with ID: %d", deckID)
 }
 
-func FetchCard(db *sql.DB, cardID int) (models.Flashcard, error){
+func FetchCard(db *sql.DB, cardID int) (models.Flashcard, error) {
 	var card models.Flashcard
 	query, err := db.Query(`SELECT * FROM CARDS WHERE ID = ? LIMIT 1`, cardID)
 
-	if err != nil{
+	if err != nil {
 		return card, fmt.Errorf("there was an error in query of fetchard: %v", err)
 	}
 
 	defer query.Close()
 
-	var nextReviewStr string
 	for query.Next() {
-		if err := query.Scan(
-			&card.ID,
-			&card.Front,
-			&card.Back,
-			&card.EaseFactor,
-			&card.Repetitions,
-			&card.Interval,
-			&nextReviewStr,
-			&card.DeckID); err != nil {
-			return card, fmt.Errorf("failed to scan card row: %v", err)
-		}
-		card.NextReview, err = time.Parse("2006-01-02", nextReviewStr)
-		if err != nil {
-			return card, fmt.Errorf("failed to parse NextReview date: %v", err)
-		}
-
-		if err := query.Err(); err != nil{
-			return card, fmt.Errorf("there was an error during iteration: %v", err)
-		}
+		return scanFlashcardRow(query)
 	}
-
-
-	return card , nil
+	return models.Flashcard{}, fmt.Errorf("no card was found with ID %d", cardID)
 }
 
 func DisplayArrDecks(decks []models.Deck) error {
