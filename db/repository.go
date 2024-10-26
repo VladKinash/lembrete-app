@@ -4,7 +4,6 @@ import (
 	models "Lembrete/models"
 	"database/sql"
 	"fmt"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -47,23 +46,11 @@ func FetchAllCards(db *sql.DB, deckID int32) ([]models.Flashcard, error) {
 	}
 	defer rows.Close()
 
-	var nextReviewStr string
 	for rows.Next() {
 		var card models.Flashcard
-		if err := rows.Scan(
-			&card.ID,
-			&card.Front,
-			&card.Back,
-			&card.EaseFactor,
-			&card.Repetitions,
-			&card.Interval,
-			&nextReviewStr,
-			&card.DeckID); err != nil {
-			return nil, fmt.Errorf("failed to scan card row: %v", err)
-		}
-		card.NextReview, err = time.Parse("2006-01-02", nextReviewStr)
+		card, err := scanFlashcardRow(rows)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse NextReview date: %v", err)
+			return cards, fmt.Errorf("something went wrong when scanning the cards")
 		}
 		cards = append(cards, card)
 	}
@@ -84,16 +71,12 @@ func FetchAllDecks(db *sql.DB) ([]models.Deck, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var deck models.Deck
-		if err := rows.Scan(
-			&deck.ID,
-			&deck.Name,
-			&deck.MaxNewCards,
-			&deck.MaxReviewsDaily); err != nil {
-			return nil, fmt.Errorf("failed to scan deck row: %v", err)
+		var card models.Deck
+		card, err := scanDeckRow(rows)
+		if err != nil {
+			return decks, fmt.Errorf("something went wrong when scanning the decks")
 		}
-		decks = append(decks, deck)
-
+		decks = append(decks, card)
 	}
 
 	if err := rows.Err(); err != nil {

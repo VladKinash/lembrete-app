@@ -2,8 +2,10 @@ package main
 
 import (
 	repo "Lembrete/db"
+   //models "Lembrete/models"
 	"fmt"
 	//"log"
+	//"time"
 )
 
 func main() {
@@ -13,11 +15,13 @@ func main() {
 		fmt.Println("error fetching decks: ", err)
 	}
 	defer db.Close()
-	
 
-	card, err := repo.FetchCard(db, 1)
 
-	fmt.Println(card)
-	fmt.Println(err)
+	decks, err := repo.FetchAllDecks(db)
+	if err != nil{
+		println("sad")
+	}
+
+	repo.DisplayArrDecks(decks)
 
 }
