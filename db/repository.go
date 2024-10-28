@@ -214,3 +214,49 @@ func DeleteCard(db *sql.DB, card models.Flashcard) error {
 
 	return nil
 }
+
+func UpdateCardRecord(db *sql.DB, card models.Flashcard) error {
+	stmt, err := db.Prepare(`
+	UPDATE Cards 
+	SET Front = ?, 
+		Back = ?, 
+		EaseFactor = ?, 
+		Repetitions = ?, 
+		Interval = ?, 
+		NextReview = ?, 
+		DeckID = ? 
+	WHERE ID = ?
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare card update statement: %v", err)
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID, card.ID)
+	if err != nil {
+		return fmt.Errorf("failed to execute card update statement: %v", err)
+	}
+
+	return nil
+}
+
+func UpdateDeckRecord(db *sql.DB, deck models.Deck) error {
+	stmt, err := db.Prepare(`
+        UPDATE Decks 
+        SET Name = ?, 
+            MaxNewCards = ?, 
+            MaxReviewsDaily = ? 
+        WHERE ID = ?
+    `)
+	if err != nil {
+		return fmt.Errorf("failed to prepare deck update statement: %v", err)
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(deck.Name, deck.MaxNewCards, deck.MaxReviewsDaily, deck.ID)
+	if err != nil {
+		return fmt.Errorf("failed to execute deck update statement: %v", err)
+	}
+
+	return nil
+}
