@@ -182,3 +182,35 @@ func UpdateDeckRecords(db *sql.DB, decks []models.Deck) error {
 
 	return nil
 }
+
+func DeleteDeck(db *sql.DB, deck models.Deck) error {
+
+	query, err := db.Prepare(`DELETE FROM Decks WHERE ID = ?`)
+	if err != nil {
+		return fmt.Errorf("there was an error when preparing the delete query: %v", err)
+	}
+	defer query.Close()
+
+	_, err = query.Exec(deck.ID)
+	if err != nil {
+		return fmt.Errorf("failed to execute the delete query: %v", err)
+	}
+
+	return nil
+}
+
+func DeleteCard(db *sql.DB, card models.Flashcard) error {
+
+	query, err := db.Prepare(`DELETE FROM Cards WHERE ID = ?`)
+	if err != nil {
+		return fmt.Errorf("there was an error when preparing the delete query: %v", err)
+	}
+	defer query.Close()
+
+	_, err = query.Exec(card.ID)
+	if err != nil {
+		return fmt.Errorf("failed to execute the delete query: %v", err)
+	}
+
+	return nil
+}
