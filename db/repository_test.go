@@ -198,3 +198,32 @@ func TestFetchAllDecks(t *testing.T) {
 		}
 	}
 }
+
+func TestDisplayArrDecks(t *testing.T){
+	db := setupTestDB(t)
+	defer db.Close()
+
+	decks, err := repository.FetchAllDecks(db)
+	if err != nil {
+		t.Fatalf("unexpected error when fetching all decks: %v", err)
+	}
+	err = repository.DisplayArrDecks(decks)
+	if err != nil{
+		t.Errorf("failed to display the array of decks: %v", err)
+
+	}
+}
+
+func TestDisplayArrCards(t *testing.T){
+	db := setupTestDB(t)
+	defer db.Close()
+
+	cards, err := repository.FetchAllCards(db, 1)
+	if err != nil {
+		t.Fatalf("unexpected error when fetching all cards: %v", err)
+	}
+	err = repository.DisplayArrCards(cards)
+	if err != nil{
+		t.Errorf("failed to display the array of cards: %v", err)
+	}
+}
