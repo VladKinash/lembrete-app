@@ -2,10 +2,15 @@ package main
 
 import (
 	repo "Lembrete/db"
-   //models "Lembrete/models"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+
+	//models "Lembrete/models"
 	"fmt"
 	//"log"
 	//"time"
+	gui "Lembrete/gui"
 )
 
 func main() {
@@ -16,12 +21,15 @@ func main() {
 	}
 	defer db.Close()
 
-
 	decks, err := repo.FetchAllDecks(db)
-	if err != nil{
-		println("sad")
-	}
 
-	repo.DisplayArrDecks(decks)
+	myApp := app.New()
+	myWindow := myApp.NewWindow("Anki Clone")
+
+	deckUI := gui.CreateDecksUI(decks)
+	myWindow.SetContent(deckUI)
+
+	myWindow.Resize(fyne.NewSize(400, 600))
+	myWindow.ShowAndRun()
 
 }
