@@ -14,22 +14,24 @@ import (
 )
 
 func main() {
-
 	db, err := repo.OpenDB("your_db_name")
 	if err != nil {
 		fmt.Println("error fetching decks: ", err)
+		return
 	}
 	defer db.Close()
 
 	decks, err := repo.FetchAllDecks(db)
+	if err != nil {
+		fmt.Println("error fetching decks: ", err)
+		return
+	}
 
 	myApp := app.New()
-	myWindow := myApp.NewWindow("Anki Clone")
+	myWindow := myApp.NewWindow("Lembrete")
 
-	deckUI := gui.CreateDecksUI(decks)
-	myWindow.SetContent(deckUI)
+	gui.CreateDecksUI(decks, myWindow)
 
-	myWindow.Resize(fyne.NewSize(400, 600))
+	myWindow.Resize(fyne.NewSize(600, 400))
 	myWindow.ShowAndRun()
-
 }
