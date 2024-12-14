@@ -7,31 +7,31 @@ import (
 	"math"
 )
 
-func algorithm(card f.Flashcard, quality float32) (f.Flashcard, error) {
-
+func SM2Algorithm(card f.Flashcard, quality float32) (f.Flashcard, error) {
 	if quality < 0 || quality > 5 {
-		return card, errors.New("quality cannot be larger than 5 and smaller than 0")
+		return card, errors.New("quality must be between 0 and 5")
 	}
 
 	if quality >= 3 {
-		if card.Repetitions == 0 {
+		switch card.Repetitions {
+		case 0:
+			card.Repetitions = 1
 			card.Interval = 1
-		} else if card.Repetitions == 1 {
+		case 1:
+			card.Repetitions = 2
 			card.Interval = 6
-		} else if card.Repetitions > 1 {
-			card.Interval = roundToTwoDecimals((card.Interval * card.EaseFactor))
+		default:
 			card.Repetitions++
-			updatedCard := setEaseFactor(card, quality)
-			return updatedCard, nil
+			card.Interval = roundToTwoDecimals(card.Interval * card.EaseFactor)
 		}
-	}
-
-	if quality < 3 {
+	} else {
 		card.Repetitions = 0
 		card.Interval = 1
-		if card.EaseFactor < 1.3 {
-			card.EaseFactor = 1.3
-		}
+	}
+
+	card.EaseFactor = card.EaseFactor + (0.1 - (5-quality)*(0.08+(5-quality)*0.02))
+	if card.EaseFactor < 1.3 {
+		card.EaseFactor = 1.3
 	}
 
 	return card, nil
@@ -41,7 +41,3 @@ func roundToTwoDecimals(num float32) float32 {
 	return float32(math.Round(float64(num)*100) / 100)
 }
 
-func setEaseFactor(card f.Flashcard, quality float32) f.Flashcard {
-	card.EaseFactor = card.EaseFactor + (0.1 - (5-quality)*(0.08+(5-quality)*0.02))
-	return card
-}
