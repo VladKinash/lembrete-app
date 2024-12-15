@@ -1,7 +1,6 @@
 package algorithm
 
 import (
-	//"ftm"
 	f "Lembrete/models"
 	"errors"
 	"math"
