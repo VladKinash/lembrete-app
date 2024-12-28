@@ -24,6 +24,7 @@ type reviewUIState struct {
 	ratingContainer  *fyne.Container
 	showAnswerButton *widget.Button
 	reviewWindow     fyne.Window
+	currentCard      *models.Flashcard
 }
 
 func showError(err error, window fyne.Window) {
@@ -136,7 +137,6 @@ func ShowWorkInProgress(window fyne.Window) {
 	window.SetContent(content)
 }
 
-// StartReview starts the review process for a deck.
 func StartReview(deck models.Deck, db *sql.DB, window fyne.Window) error {
 	newCards, err := repo.FetchNewCards(db, deck.ID, deck.MaxNewCards)
 	if err != nil {
@@ -205,78 +205,92 @@ func setupReviewUI() (*canvas.Text, *widget.Label, *widget.Button, *fyne.Contain
 }
 
 func createNextCardFunc(state *reviewUIState) func() {
-	var currentCard *models.Flashcard
-
 	return func() {
-		currentCard = state.reviewQueue.Next()
+		currentCard := state.reviewQueue.Next()
 		if currentCard == nil {
 			ShowReviewCompleteMessage(state.reviewWindow)
 			return
 		}
-
-		state.cardFrontLabel.Text = currentCard.Front
-		state.cardFrontLabel.Refresh()
-
-		state.cardBackLabel.SetText(currentCard.Back)
-		state.cardBackLabel.Hide()
-
-		againButton := widget.NewButton("Again", func() {
-			if err := UpdateCardAndGetNext(currentCard, 0, state); err != nil {
-				showError(err, state.reviewWindow)
-			}
-		})
-
-		hardButton := widget.NewButton("Hard", func() {
-			if err := UpdateCardAndGetNext(currentCard, 1, state); err != nil {
-				showError(err, state.reviewWindow)
-			}
-		})
-
-		goodButton := widget.NewButton("Good", func() {
-			if err := UpdateCardAndGetNext(currentCard, 2, state); err != nil {
-				showError(err, state.reviewWindow)
-			}
-		})
-
-		easyButton := widget.NewButton("Easy", func() {
-			if err := UpdateCardAndGetNext(currentCard, 3, state); err != nil {
-				showError(err, state.reviewWindow)
-			}
-		})
-
-		state.ratingContainer.Objects = []fyne.CanvasObject{againButton, hardButton, goodButton, easyButton}
-		state.ratingContainer.Refresh()
-		state.showAnswerButton.Show()
+		state.currentCard = currentCard // Store current card in state
+		updateCardDisplay(state)
 	}
 }
 
-func UpdateCardAndGetNext(card *models.Flashcard, rating int, state *reviewUIState) error {
+func updateCardDisplay(state *reviewUIState) {
+	state.cardFrontLabel.Text = state.currentCard.Front
+	state.cardFrontLabel.Refresh()
 
-	updatedCard, err := algorithm.SM2Algorithm(*card, float32(rating))
+	state.cardBackLabel.SetText(state.currentCard.Back)
+	state.cardBackLabel.Hide()
+
+	againButton := widget.NewButton("Again", func() {
+		if err := UpdateCardAndGetNext(state.currentCard, 0, state); err != nil {
+			showError(err, state.reviewWindow)
+		}
+		state.currentCard = state.reviewQueue.Next()
+		if state.currentCard == nil {
+			ShowReviewCompleteMessage(state.reviewWindow)
+			return
+		}
+		updateCardDisplay(state)
+	})
+
+	hardButton := widget.NewButton("Hard", func() {
+		if err := UpdateCardAndGetNext(state.currentCard, 1, state); err != nil {
+			showError(err, state.reviewWindow)
+		}
+		state.currentCard = state.reviewQueue.Next()
+		if state.currentCard == nil {
+			ShowReviewCompleteMessage(state.reviewWindow)
+			return
+		}
+		updateCardDisplay(state)
+	})
+
+	goodButton := widget.NewButton("Good", func() {
+		if err := UpdateCardAndGetNext(state.currentCard, 2, state); err != nil {
+			showError(err, state.reviewWindow)
+		}
+		state.currentCard = state.reviewQueue.Next()
+		if state.currentCard == nil {
+			ShowReviewCompleteMessage(state.reviewWindow)
+			return
+		}
+		updateCardDisplay(state)
+	})
+
+	easyButton := widget.NewButton("Easy", func() {
+		if err := UpdateCardAndGetNext(state.currentCard, 3, state); err != nil {
+			showError(err, state.reviewWindow)
+		}
+		state.currentCard = state.reviewQueue.Next()
+		if state.currentCard == nil {
+			ShowReviewCompleteMessage(state.reviewWindow)
+			return
+		}
+		updateCardDisplay(state)
+	})
+
+	state.ratingContainer.Objects = []fyne.CanvasObject{againButton, hardButton, goodButton, easyButton}
+	state.ratingContainer.Refresh()
+	state.showAnswerButton.Show()
+}
+
+func UpdateCardAndGetNext(card *models.Flashcard, rating int, state *reviewUIState) error {
+	updatedCard, err := algorithm.SM2Algorithm(card, float32(rating))
 	if err != nil {
 		return fmt.Errorf("error applying SM2 algorithm: %v", err)
 	}
 
-	card.NextReview = time.Now().AddDate(0, 0, int(updatedCard.Interval))
+	card.EaseFactor = updatedCard.EaseFactor
+	card.Repetitions = updatedCard.Repetitions
+	card.Interval = updatedCard.Interval
+	card.NextReview = time.Now().AddDate(0, 0, int(card.Interval))
 
-	err = repo.UpdateCardRecord(state.db, &updatedCard)
+	err = repo.UpdateCardRecord(state.db, card)
 	if err != nil {
 		return fmt.Errorf("error updating card: %v", err)
 	}
-	nextCard := state.reviewQueue.Next()
-	if nextCard == nil {
-		ShowReviewCompleteMessage(state.reviewWindow)
-		return nil
-	}
-
-	state.cardFrontLabel.Text = nextCard.Front
-	state.cardFrontLabel.Refresh()
-
-	state.cardBackLabel.SetText(nextCard.Back)
-	state.cardBackLabel.Hide()
-
-	state.ratingContainer.Refresh()
-	state.showAnswerButton.Show()
 	return nil
 }
 

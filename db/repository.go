@@ -283,13 +283,13 @@ func FetchNewCards(db *sql.DB, deckID int32, limit int32) ([]*models.Flashcard, 
 	}
 	defer rows.Close()
 
-	var cards []*models.Flashcard // Slice of pointers
+	var cards []*models.Flashcard 
 	for rows.Next() {
 		card, err := scanFlashcardRow(rows)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning card: %v", err)
 		}
-		cards = append(cards, &card) // Append the address of card
+		cards = append(cards, &card) 
 	}
 
 	if err = rows.Err(); err != nil {
@@ -307,13 +307,13 @@ func FetchDueCards(db *sql.DB, deckID int32, limit int32) ([]*models.Flashcard, 
 	}
 	defer rows.Close()
 
-	var cards []*models.Flashcard // Slice of pointers
+	var cards []*models.Flashcard 
 	for rows.Next() {
 		card, err := scanFlashcardRow(rows)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning card: %v", err)
 		}
-		cards = append(cards, &card) // Append the address of card
+		cards = append(cards, &card) 
 	}
 
 	if err = rows.Err(); err != nil {
