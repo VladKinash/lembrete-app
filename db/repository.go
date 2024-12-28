@@ -4,6 +4,7 @@ import (
 	models "Lembrete/models"
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -214,32 +215,46 @@ func DeleteCard(db *sql.DB, card models.Flashcard) error {
 
 	return nil
 }
+func UpdateCardRecord(db *sql.DB, card *models.Flashcard) error {
+    fmt.Printf("UpdateCardRecord called with card: %+v\n", *card) 
 
-func UpdateCardRecord(db *sql.DB, card models.Flashcard) error {
-	stmt, err := db.Prepare(`
-	UPDATE Cards 
-	SET Front = ?, 
-		Back = ?, 
-		EaseFactor = ?, 
-		Repetitions = ?, 
-		Interval = ?, 
-		NextReview = ?, 
-		DeckID = ? 
-	WHERE ID = ?
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare card update statement: %v", err)
-	}
-	defer stmt.Close()
+    stmt, err := db.Prepare(`
+        UPDATE Cards
+        SET Front = ?,
+            Back = ?,
+            EaseFactor = ?,
+            Repetitions = ?,
+            Interval = ?,
+            NextReview = ?,
+            DeckID = ?
+        WHERE ID = ?
+    `)
+    if err != nil {
+        fmt.Printf("Error preparing update statement: %v\n", err)
+        return fmt.Errorf("failed to prepare card update statement: %v", err)
+    }
+    defer stmt.Close()
 
-	_, err = stmt.Exec(card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID, card.ID)
-	if err != nil {
-		return fmt.Errorf("failed to execute card update statement: %v", err)
-	}
+    res, err := stmt.Exec(card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID, card.ID)
+    if err != nil {
+        fmt.Printf("Error executing update statement: %v\n", err)
+        return fmt.Errorf("failed to execute card update statement: %v", err)
+    }
 
-	return nil
+    rowsAffected, err := res.RowsAffected()
+    if err != nil {
+        fmt.Printf("Error getting affected rows: %v\n", err)
+        return fmt.Errorf("failed to get affected rows: %v", err)
+    }
+
+    fmt.Printf("Rows affected by update: %d\n", rowsAffected)
+
+    if rowsAffected == 0 {
+        return fmt.Errorf("no rows updated. check if card with ID %d exists", card.ID)
+    }
+
+    return nil
 }
-
 func UpdateDeckRecord(db *sql.DB, deck models.Deck) error {
 	stmt, err := db.Prepare(`
         UPDATE Decks 
@@ -259,4 +274,51 @@ func UpdateDeckRecord(db *sql.DB, deck models.Deck) error {
 	}
 
 	return nil
+}
+
+func FetchNewCards(db *sql.DB, deckID int32, limit int32) ([]*models.Flashcard, error) {
+	rows, err := db.Query("SELECT * FROM Cards WHERE DeckID = ? AND Repetitions = 0 LIMIT ?", deckID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select new cards for deck %d: %v", deckID, err)
+	}
+	defer rows.Close()
+
+	var cards []*models.Flashcard // Slice of pointers
+	for rows.Next() {
+		card, err := scanFlashcardRow(rows)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning card: %v", err)
+		}
+		cards = append(cards, &card) // Append the address of card
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over rows: %v", err)
+	}
+
+	return cards, nil
+}
+
+func FetchDueCards(db *sql.DB, deckID int32, limit int32) ([]*models.Flashcard, error) {
+	today := time.Now().Format("2006-01-02")
+	rows, err := db.Query("SELECT * FROM Cards WHERE DeckID = ? AND NextReview <= ? LIMIT ?", deckID, today, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select due cards for deck %d: %v", deckID, err)
+	}
+	defer rows.Close()
+
+	var cards []*models.Flashcard // Slice of pointers
+	for rows.Next() {
+		card, err := scanFlashcardRow(rows)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning card: %v", err)
+		}
+		cards = append(cards, &card) // Append the address of card
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over rows: %v", err)
+	}
+
+	return cards, nil
 }

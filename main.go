@@ -28,7 +28,7 @@ func main() {
 	}
 
 	myApp := app.New()
-	myWindow := myApp.NewWindow("Anki Clone")
+	myWindow := myApp.NewWindow("Lembrete")
 
 	gui.CreateDecksUI(decks, db, myApp, myWindow)
 

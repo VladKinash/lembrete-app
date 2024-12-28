@@ -1,24 +1,51 @@
 package gui
 
 import (
+	algorithm "Lembrete/algorithm"
+	repo "Lembrete/db"
+	"Lembrete/models"
 	"database/sql"
 	"fmt"
+	"time"
+
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
-	"Lembrete/models"
-	repo "Lembrete/db"
 )
+
+type reviewUIState struct {
+	db               *sql.DB
+	reviewQueue      *models.ReviewQueue
+	cardFrontLabel   *canvas.Text
+	cardBackLabel    *widget.Label
+	ratingContainer  *fyne.Container
+	showAnswerButton *widget.Button
+	reviewWindow     fyne.Window
+}
+
+func showError(err error, window fyne.Window) {
+	if err != nil {
+		dialog.ShowError(err, window)
+	}
+}
 
 func CreateDecksUI(decks []models.Deck, db *sql.DB, app fyne.App, window fyne.Window) {
 	deckList := container.NewVBox()
 
 	for _, deck := range decks {
 		deck := deck
-		dropdownMenu := widget.NewSelect([]string{"Show All"}, func(selected string) {
+		dropdownMenu := widget.NewSelect([]string{"Show All", "Start Review"}, func(selected string) {
 			if selected == "Show All" {
-				ShowDeckAndCards(deck, db, app, window)
+				if err := ShowDeckAndCards(deck, db, app, window); err != nil {
+					showError(err, window)
+				}
+			} else if selected == "Start Review" {
+				if err := StartReview(deck, db, window); err != nil {
+					showError(err, window)
+				}
 			}
 		})
 
@@ -38,28 +65,36 @@ func CreateDecksUI(decks []models.Deck, db *sql.DB, app fyne.App, window fyne.Wi
 	window.SetContent(centeredLayout)
 }
 
+func ShowDeckAndCards(deck models.Deck, db *sql.DB, app fyne.App, window fyne.Window) error {
+	return updateDeckAndCardsContent(deck, db, window, nil)
+}
 
+func UpdateDeckAndCards(deck models.Deck, db *sql.DB, window fyne.Window, deckColumn *fyne.Container) error {
+	return updateDeckAndCardsContent(deck, db, window, deckColumn)
+}
 
-func ShowDeckAndCards(deck models.Deck, db *sql.DB, app fyne.App, window fyne.Window) {
+func updateDeckAndCardsContent(deck models.Deck, db *sql.DB, window fyne.Window, deckColumn *fyne.Container) error {
 	cards, err := repo.FetchAllCards(db, deck.ID)
 	if err != nil {
-		fmt.Println("Error fetching cards:", err)
-		return
+		return fmt.Errorf("error fetching cards: %v", err)
 	}
 
-	deckColumn := container.NewVBox()
-	for _, d := range []models.Deck{deck} { 
-		d := d
-		deckButton := widget.NewButton(d.Name, func() {
-			UpdateDeckAndCards(d, db, window, deckColumn)
-		})
-		deckColumn.Add(deckButton)
+	if deckColumn == nil {
+		deckColumn = container.NewVBox()
+		for _, d := range []models.Deck{deck} {
+			d := d
+			deckButton := widget.NewButton(d.Name, func() {
+				if err := UpdateDeckAndCards(d, db, window, deckColumn); err != nil {
+					showError(err, window)
+				}
+			})
+			deckColumn.Add(deckButton)
+		}
 	}
 	deckScroll := container.NewVScroll(deckColumn)
 
 	cardColumn := container.NewVBox()
 	for _, card := range cards {
-		card := card
 		cardButton := widget.NewButton(card.Front, func() {
 			ShowCardDetails(card, window)
 		})
@@ -67,40 +102,13 @@ func ShowDeckAndCards(deck models.Deck, db *sql.DB, app fyne.App, window fyne.Wi
 	}
 	cardScroll := container.NewVScroll(cardColumn)
 
-	cardDetails := widget.NewLabel("Select a card to see details")
-	detailsContainer := container.NewVBox(cardDetails)
-
-	content := container.New(layout.NewGridLayout(3),
-		deckScroll, cardScroll, detailsContainer)
-
-	window.SetContent(content)
-}
-
-
-
-func UpdateDeckAndCards(deck models.Deck, db *sql.DB, window fyne.Window, deckColumn *fyne.Container) {
-	cards, err := repo.FetchAllCards(db, deck.ID)
-	if err != nil {
-		fmt.Println("Error fetching cards:", err)
-		return
-	}
-
-	cardColumn := container.NewVBox()
-	for _, card := range cards {
-		card := card
-		cardButton := widget.NewButton(card.Front, func() {
-			ShowCardDetails(card, window)
-		})
-		cardColumn.Add(cardButton)
-	}
-
-	cardScroll := container.NewVScroll(cardColumn)
 	detailsContainer := widget.NewLabel("Select a card to see details")
 
-	newContent := container.New(layout.NewGridLayout(3),
-		deckColumn, cardScroll, container.NewVBox(detailsContainer))
+	content := container.New(layout.NewGridLayout(3),
+		deckScroll, cardScroll, container.NewVBox(detailsContainer))
 
-	window.SetContent(newContent)
+	window.SetContent(content)
+	return nil
 }
 
 func ShowCardDetails(card models.Flashcard, window fyne.Window) {
@@ -117,14 +125,182 @@ func ShowCardDetails(card models.Flashcard, window fyne.Window) {
 	window.SetContent(container.New(layout.NewGridLayout(3),
 		window.Content().(*fyne.Container).Objects[0], // Keep the decks column
 		window.Content().(*fyne.Container).Objects[1], // Keep the cards column
-		cardDetails,                                   // Replace card details
+		cardDetails, // Replace card details
 	))
 }
-
 
 func ShowWorkInProgress(window fyne.Window) {
 	content := container.NewVBox(
 		widget.NewLabel("Work in progress"),
 	)
 	window.SetContent(content)
+}
+
+// StartReview starts the review process for a deck.
+func StartReview(deck models.Deck, db *sql.DB, window fyne.Window) error {
+	newCards, err := repo.FetchNewCards(db, deck.ID, deck.MaxNewCards)
+	if err != nil {
+		return fmt.Errorf("error fetching new cards: %v", err)
+	}
+
+	dueCards, err := repo.FetchDueCards(db, deck.ID, deck.MaxReviewsDaily)
+	if err != nil {
+		return fmt.Errorf("error fetching due cards: %v", err)
+	}
+
+	reviewQueue := models.NewReviewQueue(newCards, dueCards)
+
+	ShowReviewWindow(deck, db, reviewQueue, window)
+	return nil
+}
+
+func ShowReviewWindow(deck models.Deck, db *sql.DB, reviewQueue *models.ReviewQueue, window fyne.Window) {
+	reviewWindow := fyne.CurrentApp().NewWindow("Review: " + deck.Name)
+	reviewWindow.Resize(fyne.NewSize(500, 400))
+	reviewWindow.SetFixedSize(true)
+
+	cardFrontLabel, cardBackLabel, showAnswerButton, ratingContainer := setupReviewUI()
+
+	state := &reviewUIState{
+		db:               db,
+		reviewQueue:      reviewQueue,
+		cardFrontLabel:   cardFrontLabel,
+		cardBackLabel:    cardBackLabel,
+		ratingContainer:  ratingContainer,
+		showAnswerButton: showAnswerButton,
+		reviewWindow:     reviewWindow,
+	}
+
+	nextCard := createNextCardFunc(state)
+	nextCard()
+
+	content := container.NewVBox(
+		cardFrontLabel,
+		showAnswerButton,
+		cardBackLabel,
+		layout.NewSpacer(),
+		ratingContainer,
+	)
+
+	reviewWindow.SetContent(content)
+	reviewWindow.Show()
+}
+
+func setupReviewUI() (*canvas.Text, *widget.Label, *widget.Button, *fyne.Container) {
+	cardFrontLabel := canvas.NewText("Front of card", nil)
+	cardFrontLabel.Alignment = fyne.TextAlignCenter
+	cardFrontLabel.TextStyle = fyne.TextStyle{Bold: true}
+
+	cardBackLabel := widget.NewLabel("Back of card")
+	cardBackLabel.Alignment = fyne.TextAlignCenter
+	cardBackLabel.Hide()
+
+	showAnswerButton := widget.NewButton("Show Answer", func() {
+		cardBackLabel.Show()
+	})
+
+	ratingContainer := container.NewHBox()
+
+	return cardFrontLabel, cardBackLabel, showAnswerButton, ratingContainer
+}
+
+func createNextCardFunc(state *reviewUIState) func() {
+	var currentCard *models.Flashcard
+
+	return func() {
+		currentCard = state.reviewQueue.Next()
+		if currentCard == nil {
+			ShowReviewCompleteMessage(state.reviewWindow)
+			return
+		}
+
+		state.cardFrontLabel.Text = currentCard.Front
+		state.cardFrontLabel.Refresh()
+
+		state.cardBackLabel.SetText(currentCard.Back)
+		state.cardBackLabel.Hide()
+
+		againButton := widget.NewButton("Again", func() {
+			if err := UpdateCardAndGetNext(currentCard, 0, state); err != nil {
+				showError(err, state.reviewWindow)
+			}
+		})
+
+		hardButton := widget.NewButton("Hard", func() {
+			if err := UpdateCardAndGetNext(currentCard, 1, state); err != nil {
+				showError(err, state.reviewWindow)
+			}
+		})
+
+		goodButton := widget.NewButton("Good", func() {
+			if err := UpdateCardAndGetNext(currentCard, 2, state); err != nil {
+				showError(err, state.reviewWindow)
+			}
+		})
+
+		easyButton := widget.NewButton("Easy", func() {
+			if err := UpdateCardAndGetNext(currentCard, 3, state); err != nil {
+				showError(err, state.reviewWindow)
+			}
+		})
+
+		state.ratingContainer.Objects = []fyne.CanvasObject{againButton, hardButton, goodButton, easyButton}
+		state.ratingContainer.Refresh()
+		state.showAnswerButton.Show()
+	}
+}
+
+func UpdateCardAndGetNext(card *models.Flashcard, rating int, state *reviewUIState) error {
+
+	updatedCard, err := algorithm.SM2Algorithm(*card, float32(rating))
+	if err != nil {
+		return fmt.Errorf("error applying SM2 algorithm: %v", err)
+	}
+
+	card.NextReview = time.Now().AddDate(0, 0, int(updatedCard.Interval))
+
+	err = repo.UpdateCardRecord(state.db, &updatedCard)
+	if err != nil {
+		return fmt.Errorf("error updating card: %v", err)
+	}
+	nextCard := state.reviewQueue.Next()
+	if nextCard == nil {
+		ShowReviewCompleteMessage(state.reviewWindow)
+		return nil
+	}
+
+	state.cardFrontLabel.Text = nextCard.Front
+	state.cardFrontLabel.Refresh()
+
+	state.cardBackLabel.SetText(nextCard.Back)
+	state.cardBackLabel.Hide()
+
+	state.ratingContainer.Refresh()
+	state.showAnswerButton.Show()
+	return nil
+}
+
+func ShowReviewCompleteMessage(window fyne.Window) {
+	completeWindow := fyne.CurrentApp().NewWindow("Review Complete")
+	completeWindow.Resize(fyne.NewSize(300, 200))
+
+	messageLabel := widget.NewLabel("Review complete for now!")
+	messageLabel.Alignment = fyne.TextAlignCenter
+
+	okButton := widget.NewButton("OK", func() {
+		completeWindow.Close()
+		window.Close()
+	})
+	okButton.SetText("OK")
+
+	content := container.New(layout.NewVBoxLayout(),
+		layout.NewSpacer(),
+		messageLabel,
+		layout.NewSpacer(),
+		okButton,
+		layout.NewSpacer(),
+	)
+
+	completeWindow.SetContent(content)
+	completeWindow.Show()
 }
