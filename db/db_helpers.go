@@ -44,15 +44,39 @@ func CreateTableCard(db *sql.DB) error {
 	return nil
 }
 
-func OpenDB(dbName string) (*sql.DB, error) {
+func OpenAndInitializeDB(dbName string) (*sql.DB, error) {
+
 	dbName = "./" + dbName + ".db"
+
 	database, err := sql.Open("sqlite", dbName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open or create database: %w", err)
+		return nil, fmt.Errorf("failed to open or create database, %w", err)
 	}
 	if err = database.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to connect to the database: %v", err)
+		return nil, fmt.Errorf("failed to connect to the database")
 	}
+
+	if err := CreateTableDeck(database); err != nil {
+		return nil, fmt.Errorf("failed to create TableDeck: %v", err)
+	}
+
+	if err := CreateTableCard(database); err != nil {
+		return nil, fmt.Errorf("failed to create Cards table: %v", err)
+	}
+
+	decks, err := FetchAllDecks(database)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch decks: %v", err)
+	}
+
+	if len(decks) == 0 {
+		defaultDeck := models.NewDeck(5, 20, "Default", 0)
+		if err := InsertDeck(database, defaultDeck); err != nil {
+			return nil, fmt.Errorf("failed to create default deck: %v", err)
+		}
+		fmt.Println("Created default deck:", defaultDeck.Name)
+	}
+
 	return database, nil
 }
 
