@@ -115,3 +115,18 @@ func scanFlashcardRow(row *sql.Rows) (models.Flashcard, error) {
 
 	return card, nil
 }
+
+func CountCards(db *sql.DB, deckID int32) (newCards int, dueCards int, err error) {
+	err = db.QueryRow("SELECT COUNT(*) FROM Cards WHERE DeckID = ? AND Repetitions = 0", deckID).Scan(&newCards)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error counting new cards: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	err = db.QueryRow("SELECT COUNT(*) FROM Cards WHERE DeckID = ? AND NextReview <= ?", deckID, today).Scan(&dueCards)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error counting due cards: %v", err)
+	}
+
+	return newCards, dueCards, nil
+}

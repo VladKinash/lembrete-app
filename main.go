@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	db, err := repo.OpenAndInitializeDB("your_db_name")
+	db, err := repo.OpenAndInitializeDB("main")
 	if err != nil {
 		fmt.Println("Error initializing database:", err)
 		return

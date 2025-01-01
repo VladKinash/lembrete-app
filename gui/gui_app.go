@@ -6,6 +6,7 @@ import (
 	"Lembrete/models"
 	"database/sql"
 	"fmt"
+	"image/color"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -51,7 +52,7 @@ func CreateDecksUI(decks []models.Deck, db *sql.DB, app fyne.App, window fyne.Wi
 		})
 
 		deckButton := widget.NewButton(deck.Name, func() {
-			ShowWorkInProgress(window)
+			showDeckOverview(deck, db, window)
 		})
 
 		row := container.NewHBox(deckButton, dropdownMenu)
@@ -317,4 +318,62 @@ func ShowReviewCompleteMessage(window fyne.Window) {
 
 	completeWindow.SetContent(content)
 	completeWindow.Show()
+}
+
+func showDeckOverview(deck models.Deck, db *sql.DB, window fyne.Window) {
+    newCardsCount, dueCardsCount, err := repo.CountCards(db, deck.ID)
+    if err != nil {
+        showError(err, window)
+        return
+    }
+
+    deckNameText := canvas.NewText(deck.Name, color.White)
+    deckNameText.TextStyle = fyne.TextStyle{Bold: true}
+    deckNameText.Alignment = fyne.TextAlignCenter
+    deckNameText.TextSize = 20 
+
+    
+    studyButton := widget.NewButton("Study", func() {
+        if err := StartReview(deck, db, window); err != nil {
+            showError(err, window)
+        }
+    })
+
+    backButton := widget.NewButton("Back", func() {
+        decks, err := repo.FetchAllDecks(db)
+        if err != nil {
+            showError(err, window)
+            return
+        }
+        CreateDecksUI(decks, db, fyne.CurrentApp(), window)
+    })
+
+
+    newCardsText := canvas.NewText(fmt.Sprintf("New: %d", newCardsCount), color.White)
+    newCardsText.TextStyle = fyne.TextStyle{Bold: true}
+    newCardsText.Alignment = fyne.TextAlignCenter
+
+    dueCardsText := canvas.NewText(fmt.Sprintf("Due: %d", dueCardsCount), color.White)
+    dueCardsText.TextStyle = fyne.TextStyle{Bold: true}
+    dueCardsText.Alignment = fyne.TextAlignCenter
+
+    statsContainer := container.New(layout.NewGridLayout(2),
+        newCardsText, dueCardsText,
+    )
+
+    content := container.New(layout.NewVBoxLayout(),
+        deckNameText,       
+        statsContainer,     
+        layout.NewSpacer(), 
+        studyButton,       
+        layout.NewSpacer(), 
+        backButton,         
+    )
+
+    paddedContent := container.NewPadded(content)
+
+    window.SetContent(paddedContent)
+    window.Resize(fyne.NewSize(600, 400))
+    window.CenterOnScreen()
+    window.Show()
 }
