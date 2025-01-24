@@ -19,61 +19,77 @@ import (
 
 func CreateDecksUI(decks []models.Deck, db *sql.DB, app fyne.App, window fyne.Window) {
 	deckList := container.NewVBox()
+
 	for _, deck := range decks {
-		dropdownMenu := widget.NewSelect(
-			[]string{"Show All", "Start Review", "Delete Deck"},
-			func(selected string) {
-				if selected == "Show All" {
-					newWindow := app.NewWindow("All Cards: " + deck.Name)
-					newWindow.Resize(fyne.NewSize(800, 600))
-					err := ShowDeckAndCards(deck, db, app, newWindow)
-					if err != nil {
-						showError(err, newWindow)
-					}
-					newWindow.Show()
-				} else if selected == "Start Review" {
-					err := StartReview(deck, db, window)
-					if err != nil {
-						showError(err, window)
-					}
-				} else if selected == "Delete Deck" {
-					dialog.ShowConfirm("Delete Deck",
-						"Are you sure you want to delete this deck?",
-						func(confirmed bool) {
-							if confirmed {
-								err := repo.DeleteDeck(db, deck)
-								if err != nil {
-									showError(err, window)
-									return
-								}
-								decks, err := repo.FetchAllDecks(db)
-								if err != nil {
-									showError(err, window)
-									return
-								}
-								CreateDecksUI(decks, db, app, window)
-							}
-						},
-						window)
-				}
-			},
-		)
-		deckButton := widget.NewButton(deck.Name, func() {
-			showDeckOverview(deck, db, window)
-		})
-		row := container.NewGridWithColumns(2, deckButton, dropdownMenu)
-		deckList.Add(row)
+		deckList.Add(createDeckRow(deck, db, app, window))
 	}
 
 	createDeckButton := widget.NewButton("Create Deck", func() {
 		showCreateDeckDialog(db, app, window)
 	})
+	deckList.Add(container.NewHBox(createDeckButton, layout.NewSpacer()))
 
-	createRow := container.NewGridWithColumns(2, createDeckButton, layout.NewSpacer())
-	deckList.Add(createRow)
+	window.SetContent(container.NewCenter(deckList))
+}
 
-	content := container.NewCenter(deckList)
-	window.SetContent(content)
+func createDeckRow(deck models.Deck, db *sql.DB, app fyne.App, window fyne.Window) *fyne.Container {
+	deckButton := widget.NewButton(deck.Name, func() {
+		showDeckOverview(deck, db, window)
+	})
+
+	actions := []string{"Show All", "Start Review", "Delete Deck"}
+	actionsDropdown := widget.NewSelect(actions, func(selected string) {
+		handleDeckAction(selected, deck, db, app, window)
+	})
+
+	return container.NewHBox(deckButton, actionsDropdown)
+}
+
+func handleDeckAction(action string, deck models.Deck, db *sql.DB, app fyne.App, window fyne.Window) {
+	switch action {
+	case "Show All":
+		showAllCards(deck, db, app)
+	case "Start Review":
+		startDeckReview(deck, db, window)
+	case "Delete Deck":
+		confirmAndDeleteDeck(deck, db, app, window)
+	}
+}
+
+func showAllCards(deck models.Deck, db *sql.DB, app fyne.App) {
+	newWindow := app.NewWindow("All Cards: " + deck.Name)
+	newWindow.Resize(fyne.NewSize(800, 600))
+	if err := ShowDeckAndCards(deck, db, app, newWindow); err != nil {
+		showError(err, newWindow)
+	}
+	newWindow.Show()
+}
+
+func startDeckReview(deck models.Deck, db *sql.DB, window fyne.Window) {
+	if err := StartReview(deck, db, window); err != nil {
+		showError(err, window)
+	}
+}
+
+func confirmAndDeleteDeck(deck models.Deck, db *sql.DB, app fyne.App, window fyne.Window) {
+	dialog.ShowConfirm("Delete Deck", "Are you sure you want to delete this deck?", func(confirmed bool) {
+		if confirmed {
+			deleteDeckAndRefreshUI(deck, db, app, window)
+		}
+	}, window)
+}
+
+func deleteDeckAndRefreshUI(deck models.Deck, db *sql.DB, app fyne.App, window fyne.Window) {
+	if err := repo.DeleteDeck(db, deck); err != nil {
+		showError(err, window)
+		return
+	}
+	decks, err := repo.FetchAllDecks(db)
+	if err != nil {
+		showError(err, window)
+		return
+	}
+	CreateDecksUI(decks, db, app, window)
 }
 
 

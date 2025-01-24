@@ -75,7 +75,7 @@ func ShowReviewWindow(deck models.Deck, db *sql.DB, reviewQueue *models.ReviewQu
 
 		nextCard := state.reviewQueue.Next()
 		if nextCard == nil {
-			ShowReviewCompleteMessage(reviewWindow)
+			ShowNoMoreCardsMessage(reviewWindow)
 			return
 		}
 		state.currentCard = nextCard
@@ -97,6 +97,8 @@ func ShowReviewWindow(deck models.Deck, db *sql.DB, reviewQueue *models.ReviewQu
 	state.currentCard = reviewQueue.Next()
 	if state.currentCard != nil {
 		updateCardDisplay(state)
+	} else {
+		ShowNoMoreCardsMessage(reviewWindow)
 	}
 
 	content := container.NewVBox(
@@ -208,3 +210,28 @@ func ShowReviewCompleteMessage(window fyne.Window) {
 	completeWindow.SetContent(content)
 	completeWindow.Show()
 }
+
+func ShowNoMoreCardsMessage(window fyne.Window) {
+	messageWindow := fyne.CurrentApp().NewWindow("No More Cards")
+	messageWindow.Resize(fyne.NewSize(600, 400))
+
+	messageLabel := widget.NewLabel("No more cards to review!")
+	messageLabel.Alignment = fyne.TextAlignCenter
+
+	okButton := widget.NewButton("OK", func() {
+		messageWindow.Close()
+		window.Close()
+	})
+
+	content := container.New(layout.NewVBoxLayout(),
+		layout.NewSpacer(),
+		messageLabel,
+		layout.NewSpacer(),
+		okButton,
+		layout.NewSpacer(),
+	)
+
+	messageWindow.SetContent(content)
+	messageWindow.Show()
+}
+
