@@ -23,6 +23,7 @@ type reviewUIState struct {
 	cardBackLabel    *widget.Label
 	ratingContainer  *fyne.Container
 	showAnswerButton *widget.Button
+	buttonContainer  *fyne.Container
 	reviewWindow     fyne.Window
 	currentCard      *models.Flashcard
 }
@@ -46,10 +47,9 @@ func StartReview(deck models.Deck, db *sql.DB, window fyne.Window) error {
 
 func ShowReviewWindow(deck models.Deck, db *sql.DB, reviewQueue *models.ReviewQueue, window fyne.Window) {
 	reviewWindow := fyne.CurrentApp().NewWindow("Review: " + deck.Name)
-	reviewWindow.Resize(fyne.NewSize(500, 400))
-	reviewWindow.SetFixedSize(true)
+	reviewWindow.Resize(fyne.NewSize(800, 600))
 
-	cardFrontLabel, cardBackLabel, showAnswerButton, ratingContainer := setupReviewUI()
+	cardFrontLabel, cardBackLabel, showAnswerButton, againButton, hardButton, goodButton, easyButton, ratingContainer, buttonContainer := setupReviewUI()
 
 	state := &reviewUIState{
 		db:               db,
@@ -58,54 +58,103 @@ func ShowReviewWindow(deck models.Deck, db *sql.DB, reviewQueue *models.ReviewQu
 		cardBackLabel:    cardBackLabel,
 		ratingContainer:  ratingContainer,
 		showAnswerButton: showAnswerButton,
+		buttonContainer:  buttonContainer,
 		reviewWindow:     reviewWindow,
 	}
 
-	nextCard := createNextCardFunc(state)
-	nextCard()
+	rateAndProceed := func(rating int) {
+		if err := UpdateCardAndGetNext(state.currentCard, rating, state); err != nil {
+			showError(err, reviewWindow)
+			return
+		}
+
+		state.ratingContainer.Hide()
+		state.showAnswerButton.Show()
+		state.cardBackLabel.Hide()
+		state.buttonContainer.Refresh()
+
+		nextCard := state.reviewQueue.Next()
+		if nextCard == nil {
+			ShowReviewCompleteMessage(reviewWindow)
+			return
+		}
+		state.currentCard = nextCard
+		updateCardDisplay(state)
+	}
+
+	showAnswerButton.OnTapped = func() {
+		cardBackLabel.Show()
+		showAnswerButton.Hide()
+		ratingContainer.Show()
+		buttonContainer.Refresh()
+	}
+
+	againButton.OnTapped = func() { rateAndProceed(0) }
+	hardButton.OnTapped = func() { rateAndProceed(3) }
+	goodButton.OnTapped = func() { rateAndProceed(4) }
+	easyButton.OnTapped = func() { rateAndProceed(5) }
+
+	state.currentCard = reviewQueue.Next()
+	if state.currentCard != nil {
+		updateCardDisplay(state)
+	}
 
 	content := container.NewVBox(
+		layout.NewSpacer(),
 		cardFrontLabel,
-		showAnswerButton,
+		layout.NewSpacer(),
 		cardBackLabel,
 		layout.NewSpacer(),
-		ratingContainer,
+		buttonContainer,
 	)
-
 	reviewWindow.SetContent(content)
 	reviewWindow.Show()
 }
 
-func setupReviewUI() (*canvas.Text, *widget.Label, *widget.Button, *fyne.Container) {
+func setupReviewUI() (
+	*canvas.Text,
+	*widget.Label,
+	*widget.Button,
+	*widget.Button,
+	*widget.Button,
+	*widget.Button,
+	*widget.Button,
+	*fyne.Container,
+	*fyne.Container,
+) {
 	cardFrontLabel := canvas.NewText("Front of card", nil)
 	cardFrontLabel.Alignment = fyne.TextAlignCenter
+	cardFrontLabel.TextSize = 24
 	cardFrontLabel.TextStyle = fyne.TextStyle{Bold: true}
 
 	cardBackLabel := widget.NewLabel("Back of card")
 	cardBackLabel.Alignment = fyne.TextAlignCenter
 	cardBackLabel.Hide()
 
-	showAnswerButton := widget.NewButton("Show Answer", func() {
-		cardBackLabel.Show()
-	})
+	showAnswerButton := widget.NewButton("Show Answer", nil)
 
-	ratingContainer := container.NewHBox()
+	againButton := widget.NewButton("Again", nil)
+	hardButton := widget.NewButton("Hard", nil)
+	goodButton := widget.NewButton("Good", nil)
+	easyButton := widget.NewButton("Easy", nil)
 
-	return cardFrontLabel, cardBackLabel, showAnswerButton, ratingContainer
+	ratingContainer := container.NewHBox(
+		layout.NewSpacer(),
+		againButton,
+		hardButton,
+		goodButton,
+		easyButton,
+		layout.NewSpacer(),
+	)
+	ratingContainer.Hide()
+
+	buttonContainer := container.NewVBox(
+		showAnswerButton,
+		ratingContainer,
+	)
+
+	return cardFrontLabel, cardBackLabel, showAnswerButton, againButton, hardButton, goodButton, easyButton, ratingContainer, buttonContainer
 }
-
-func createNextCardFunc(state *reviewUIState) func() {
-	return func() {
-		currentCard := state.reviewQueue.Next()
-		if currentCard == nil {
-			ShowReviewCompleteMessage(state.reviewWindow)
-			return
-		}
-		state.currentCard = currentCard
-		updateCardDisplay(state)
-	}
-}
-
 func updateCardDisplay(state *reviewUIState) {
 	state.cardFrontLabel.Text = state.currentCard.Front
 	state.cardFrontLabel.Refresh()
@@ -113,57 +162,9 @@ func updateCardDisplay(state *reviewUIState) {
 	state.cardBackLabel.SetText(state.currentCard.Back)
 	state.cardBackLabel.Hide()
 
-	againButton := widget.NewButton("Again", func() {
-		if err := UpdateCardAndGetNext(state.currentCard, 0, state); err != nil {
-			showError(err, state.reviewWindow)
-		}
-		state.currentCard = state.reviewQueue.Next()
-		if state.currentCard == nil {
-			ShowReviewCompleteMessage(state.reviewWindow)
-			return
-		}
-		updateCardDisplay(state)
-	})
-
-	hardButton := widget.NewButton("Hard", func() {
-		if err := UpdateCardAndGetNext(state.currentCard, 1, state); err != nil {
-			showError(err, state.reviewWindow)
-		}
-		state.currentCard = state.reviewQueue.Next()
-		if state.currentCard == nil {
-			ShowReviewCompleteMessage(state.reviewWindow)
-			return
-		}
-		updateCardDisplay(state)
-	})
-
-	goodButton := widget.NewButton("Good", func() {
-		if err := UpdateCardAndGetNext(state.currentCard, 2, state); err != nil {
-			showError(err, state.reviewWindow)
-		}
-		state.currentCard = state.reviewQueue.Next()
-		if state.currentCard == nil {
-			ShowReviewCompleteMessage(state.reviewWindow)
-			return
-		}
-		updateCardDisplay(state)
-	})
-
-	easyButton := widget.NewButton("Easy", func() {
-		if err := UpdateCardAndGetNext(state.currentCard, 3, state); err != nil {
-			showError(err, state.reviewWindow)
-		}
-		state.currentCard = state.reviewQueue.Next()
-		if state.currentCard == nil {
-			ShowReviewCompleteMessage(state.reviewWindow)
-			return
-		}
-		updateCardDisplay(state)
-	})
-
-	state.ratingContainer.Objects = []fyne.CanvasObject{againButton, hardButton, goodButton, easyButton}
-	state.ratingContainer.Refresh()
+	state.ratingContainer.Hide()
 	state.showAnswerButton.Show()
+	state.buttonContainer.Refresh()
 }
 
 func UpdateCardAndGetNext(card *models.Flashcard, rating int, state *reviewUIState) error {
@@ -185,25 +186,25 @@ func UpdateCardAndGetNext(card *models.Flashcard, rating int, state *reviewUISta
 }
 
 func ShowReviewCompleteMessage(window fyne.Window) {
-    completeWindow := fyne.CurrentApp().NewWindow("Review Complete")
-    completeWindow.Resize(fyne.NewSize(300, 200))
+	completeWindow := fyne.CurrentApp().NewWindow("Review Complete")
+	completeWindow.Resize(fyne.NewSize(600, 400))
 
-    messageLabel := widget.NewLabel("Review complete for now!")
-    messageLabel.Alignment = fyne.TextAlignCenter
+	messageLabel := widget.NewLabel("Review complete for now!")
+	messageLabel.Alignment = fyne.TextAlignCenter
 
-    okButton := widget.NewButton("OK", func() {
-        completeWindow.Close()
-        window.Close()
-    })
+	okButton := widget.NewButton("OK", func() {
+		completeWindow.Close()
+		window.Close()
+	})
 
-    content := container.New(layout.NewVBoxLayout(),
-        layout.NewSpacer(),
-        messageLabel,
-        layout.NewSpacer(), 
-        okButton,
-        layout.NewSpacer(),
-    )
+	content := container.New(layout.NewVBoxLayout(),
+		layout.NewSpacer(),
+		messageLabel,
+		layout.NewSpacer(),
+		okButton,
+		layout.NewSpacer(),
+	)
 
-    completeWindow.SetContent(content)
-    completeWindow.Show()
+	completeWindow.SetContent(content)
+	completeWindow.Show()
 }
