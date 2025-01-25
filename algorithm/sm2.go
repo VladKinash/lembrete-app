@@ -6,9 +6,9 @@ import (
 	"math"
 )
 
-func SM2Algorithm(card *f.Flashcard, quality float32) (*f.Flashcard, error) { // Accept and return a pointer
+func SM2Algorithm(card *f.Flashcard, quality float32) (*f.Flashcard, error) {
 	if quality < 0 || quality > 5 {
-		return nil, errors.New("quality must be between 0 and 5") // Return nil for the pointer on error
+		return nil, errors.New("quality must be between 0 and 5") 
 	}
 
 	if quality >= 3 {
@@ -33,7 +33,7 @@ func SM2Algorithm(card *f.Flashcard, quality float32) (*f.Flashcard, error) { //
 		card.EaseFactor = 1.3
 	}
 
-	return card, nil // Return the pointer
+	return card, nil
 }
 
 func roundToTwoDecimals(num float32) float32 {
