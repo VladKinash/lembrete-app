@@ -14,16 +14,16 @@ import (
 )
 
 func main() {
-	db, err := repo.OpenDB("your_db_name")
+	db, err := repo.OpenAndInitializeDB("main")
 	if err != nil {
-		fmt.Println("error fetching decks: ", err)
+		fmt.Println("Error initializing database:", err)
 		return
 	}
 	defer db.Close()
 
 	decks, err := repo.FetchAllDecks(db)
 	if err != nil {
-		fmt.Println("error fetching decks: ", err)
+		fmt.Println("Error fetching decks:", err)
 		return
 	}
 

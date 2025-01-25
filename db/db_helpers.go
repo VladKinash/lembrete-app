@@ -44,15 +44,39 @@ func CreateTableCard(db *sql.DB) error {
 	return nil
 }
 
-func OpenDB(dbName string) (*sql.DB, error) {
+func OpenAndInitializeDB(dbName string) (*sql.DB, error) {
+
 	dbName = "./" + dbName + ".db"
+
 	database, err := sql.Open("sqlite", dbName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open or create database: %w", err)
+		return nil, fmt.Errorf("failed to open or create database, %w", err)
 	}
 	if err = database.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to connect to the database: %v", err)
+		return nil, fmt.Errorf("failed to connect to the database")
 	}
+
+	if err := CreateTableDeck(database); err != nil {
+		return nil, fmt.Errorf("failed to create TableDeck: %v", err)
+	}
+
+	if err := CreateTableCard(database); err != nil {
+		return nil, fmt.Errorf("failed to create Cards table: %v", err)
+	}
+
+	decks, err := FetchAllDecks(database)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch decks: %v", err)
+	}
+
+	if len(decks) == 0 {
+		defaultDeck := models.NewDeck(5, 20, "Default", 0)
+		if err := InsertDeck(database, defaultDeck); err != nil {
+			return nil, fmt.Errorf("failed to create default deck: %v", err)
+		}
+		fmt.Println("Created default deck:", defaultDeck.Name)
+	}
+
 	return database, nil
 }
 
@@ -90,4 +114,19 @@ func scanFlashcardRow(row *sql.Rows) (models.Flashcard, error) {
 	}
 
 	return card, nil
+}
+
+func CountCards(db *sql.DB, deckID int32) (newCards int, dueCards int, err error) {
+	err = db.QueryRow("SELECT COUNT(*) FROM Cards WHERE DeckID = ? AND Repetitions = 0", deckID).Scan(&newCards)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error counting new cards: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	err = db.QueryRow("SELECT COUNT(*) FROM Cards WHERE DeckID = ? AND NextReview <= ?", deckID, today).Scan(&dueCards)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error counting due cards: %v", err)
+	}
+
+	return newCards, dueCards, nil
 }

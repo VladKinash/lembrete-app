@@ -33,7 +33,7 @@ func SM2Algorithm(card *f.Flashcard, quality float32) (*f.Flashcard, error) {
 		card.EaseFactor = 1.3
 	}
 
-	return card, nil // Return the pointer
+	return card, nil
 }
 
 func roundToTwoDecimals(num float32) float32 {
