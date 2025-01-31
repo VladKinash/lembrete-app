@@ -174,147 +174,176 @@ func showDeckOverview(deck models.Deck, db *sql.DB, window fyne.Window) {
 
 func showCreateDeckDialog(db *sql.DB, app fyne.App, window fyne.Window) {
     deckNameEntry := widget.NewEntry()
+    deckNameEntry.SetPlaceHolder("Enter deck name")
     maxNewCardsEntry := widget.NewEntry()
+    maxNewCardsEntry.SetPlaceHolder("Optional")
     maxReviewsEntry := widget.NewEntry()
+    maxReviewsEntry.SetPlaceHolder("Optional")
 
-    formItems := []*widget.FormItem{
-        {Text: "Deck Name", Widget: deckNameEntry},
-        {Text: "Max New Cards (Optional)", Widget: maxNewCardsEntry},
-        {Text: "Max Reviews (Optional)", Widget: maxReviewsEntry},
+    formContainer := container.NewVBox(
+        widget.NewLabel("Deck Name"),
+        deckNameEntry,
+        widget.NewLabel("Max New Cards (Optional)"),
+        maxNewCardsEntry,
+        widget.NewLabel("Max Reviews (Optional)"),
+        maxReviewsEntry,
+    )
+
+    var createDeckDialog dialog.Dialog
+
+    onSubmit := func() {
+        deckName := deckNameEntry.Text
+        if deckName == "" {
+            dialog.ShowError(fmt.Errorf("deck name cannot be empty"), window)
+            return
+        }
+
+        var maxNewCards int32 = 0
+        if maxNewCardsEntry.Text != "" {
+            var newCards int
+            _, err := fmt.Sscan(maxNewCardsEntry.Text, &newCards)
+            if err != nil {
+                dialog.ShowError(fmt.Errorf("invalid Max New Cards value"), window)
+                return
+            }
+            maxNewCards = int32(newCards)
+        }
+
+        var maxReviews int32 = 0
+        if maxReviewsEntry.Text != "" {
+            var reviews int
+            _, err := fmt.Sscan(maxReviewsEntry.Text, &reviews)
+            if err != nil {
+                dialog.ShowError(fmt.Errorf("invalid Max Reviews value"), window)
+                return
+            }
+            maxReviews = int32(reviews)
+        }
+
+        newDeck := models.Deck{
+            Name:           deckName,
+            MaxNewCards:    maxNewCards,
+            MaxReviewsDaily: maxReviews,
+        }
+
+        err := repo.InsertDeck(db, newDeck)
+        if err != nil {
+            dialog.ShowError(err, window)
+            return
+        }
+
+        dialog.ShowInformation("Success", "Deck created successfully!", window)
+        decks, err := repo.FetchAllDecks(db)
+        if err != nil {
+            dialog.ShowError(fmt.Errorf("error updating deck list: %v", err), window)
+            return
+        }
+
+        CreateDecksUI(decks, db, app, window)
+        createDeckDialog.Hide()
     }
 
-    form := &widget.Form{
-        Items: formItems,
-        OnSubmit: func() {
-            deckName := deckNameEntry.Text
-            if deckName == "" {
-                dialog.ShowError(fmt.Errorf("deck name cannot be empty"), window)
-                return
-            }
+    createButton := widget.NewButton("Create", onSubmit)
+    buttonContainer := container.NewHBox(layout.NewSpacer(), createButton)
 
-            var maxNewCards int32 = 0
-            if maxNewCardsEntry.Text != "" {
-                var newCards int
-                _, err := fmt.Sscan(maxNewCardsEntry.Text, &newCards)
-                if err != nil {
-                    dialog.ShowError(fmt.Errorf("invalid Max New Cards value"), window)
-                    return
-                }
-                maxNewCards = int32(newCards)
-            }
+    content := container.NewVBox(
+        formContainer,
+        buttonContainer,
+    )
 
-            var maxReviews int32 = 0
-            if maxReviewsEntry.Text != "" {
-                var reviews int
-                _, err := fmt.Sscan(maxReviewsEntry.Text, &reviews)
-                if err != nil {
-                    dialog.ShowError(fmt.Errorf("invalid Max Reviews value"), window)
-                    return
-                }
-                maxReviews = int32(reviews)
-            }
+    createDeckDialog = dialog.NewCustom("Create New Deck", "Cancel", content, window)
+    createDeckDialog.Show()
 
-            newDeck := models.Deck{
-                Name:           deckName,
-                MaxNewCards:    maxNewCards,
-                MaxReviewsDaily: maxReviews,
-            }
-
-            err := repo.InsertDeck(db, newDeck)
-            if err != nil {
-                dialog.ShowError(err, window)
-                return
-            }
-
-            dialog.ShowInformation("Success", "Deck created successfully!", window)
-
-            decks, err := repo.FetchAllDecks(db)
-            if err != nil {
-                dialog.ShowError(fmt.Errorf("error updating deck list: %v", err), window)
-                return
-            }
-
-            CreateDecksUI(decks, db, app, window)
-        },
-        SubmitText: "Create",
-    }
-
-	dialog.ShowCustom("Create New Deck", "Cancel", form, window)
+    deckNameEntry.OnSubmitted = func(_ string) { onSubmit() }
+    maxNewCardsEntry.OnSubmitted = func(_ string) { onSubmit() }
+    maxReviewsEntry.OnSubmitted = func(_ string) { onSubmit() }
 }
 
 
 func showEditDeckDialog(deck models.Deck, db *sql.DB, app fyne.App, window fyne.Window) {
     deckNameEntry := widget.NewEntry()
     deckNameEntry.SetText(deck.Name)
-
     maxNewCardsEntry := widget.NewEntry()
     maxNewCardsEntry.SetText(fmt.Sprintf("%d", deck.MaxNewCards))
-
     maxReviewsEntry := widget.NewEntry()
     maxReviewsEntry.SetText(fmt.Sprintf("%d", deck.MaxReviewsDaily))
 
-    formItems := []*widget.FormItem{
-        {Text: "Deck Name", Widget: deckNameEntry},
-        {Text: "Max New Cards (Optional)", Widget: maxNewCardsEntry},
-        {Text: "Max Reviews (Optional)", Widget: maxReviewsEntry},
+    formContainer := container.NewVBox(
+        widget.NewLabel("Deck Name"),
+        deckNameEntry,
+        widget.NewLabel("Max New Cards (Optional)"),
+        maxNewCardsEntry,
+        widget.NewLabel("Max Reviews (Optional)"),
+        maxReviewsEntry,
+    )
+
+    var editDeckDialog dialog.Dialog
+
+    onSubmit := func() {
+        deckName := deckNameEntry.Text
+        if deckName == "" {
+            dialog.ShowError(fmt.Errorf("deck name cannot be empty"), window)
+            return
+        }
+
+        var maxNewCards int32 = 0
+        if maxNewCardsEntry.Text != "" {
+            var newCards int
+            _, err := fmt.Sscan(maxNewCardsEntry.Text, &newCards)
+            if err != nil {
+                dialog.ShowError(fmt.Errorf("invalid Max New Cards value"), window)
+                return
+            }
+            maxNewCards = int32(newCards)
+        }
+
+        var maxReviews int32 = 0
+        if maxReviewsEntry.Text != "" {
+            var reviews int
+            _, err := fmt.Sscan(maxReviewsEntry.Text, &reviews)
+            if err != nil {
+                dialog.ShowError(fmt.Errorf("invalid Max Reviews value"), window)
+                return
+            }
+            maxReviews = int32(reviews)
+        }
+
+        updatedDeck := models.Deck{
+            ID:              deck.ID,
+            Name:            deckName,
+            MaxNewCards:     maxNewCards,
+            MaxReviewsDaily: maxReviews,
+        }
+
+        err := repo.UpdateDeckRecord(db, updatedDeck)
+        if err != nil {
+            dialog.ShowError(err, window)
+            return
+        }
+
+        dialog.ShowInformation("Success", "Deck updated successfully!", window)
+        decks, err := repo.FetchAllDecks(db)
+        if err != nil {
+            dialog.ShowError(fmt.Errorf("error updating deck list: %v", err), window)
+            return
+        }
+
+        CreateDecksUI(decks, db, app, window)
+        editDeckDialog.Hide()
     }
 
-    form := &widget.Form{
-        Items: formItems,
-        OnSubmit: func() {
-            deckName := deckNameEntry.Text
-            if deckName == "" {
-                dialog.ShowError(fmt.Errorf("deck name cannot be empty"), window)
-                return
-            }
+    updateButton := widget.NewButton("Update", onSubmit)
+    buttonContainer := container.NewHBox(layout.NewSpacer(), updateButton)
 
-            var maxNewCards int32 = 0
-            if maxNewCardsEntry.Text != "" {
-                var newCards int
-                _, err := fmt.Sscan(maxNewCardsEntry.Text, &newCards)
-                if err != nil {
-                    dialog.ShowError(fmt.Errorf("invalid Max New Cards value"), window)
-                    return
-                }
-                maxNewCards = int32(newCards)
-            }
+    content := container.NewVBox(
+        formContainer,
+        buttonContainer,
+    )
 
-            var maxReviews int32 = 0
-            if maxReviewsEntry.Text != "" {
-                var reviews int
-                _, err := fmt.Sscan(maxReviewsEntry.Text, &reviews)
-                if err != nil {
-                    dialog.ShowError(fmt.Errorf("invalid Max Reviews value"), window)
-                    return
-                }
-                maxReviews = int32(reviews)
-            }
+    editDeckDialog = dialog.NewCustom("Edit Deck", "Cancel", content, window)
+    editDeckDialog.Show()
 
-            updatedDeck := models.Deck{
-                ID:              deck.ID,
-                Name:            deckName,
-                MaxNewCards:     maxNewCards,
-                MaxReviewsDaily: maxReviews,
-            }
-
-            err := repo.UpdateDeckRecord(db, updatedDeck)
-            if err != nil {
-                dialog.ShowError(err, window)
-                return
-            }
-
-            dialog.ShowInformation("Success", "Deck updated successfully!", window)
-
-            decks, err := repo.FetchAllDecks(db)
-            if err != nil {
-                dialog.ShowError(fmt.Errorf("error updating deck list: %v", err), window)
-                return
-            }
-
-            CreateDecksUI(decks, db, app, window)
-        },
-        SubmitText: "Update",
-    }
-
-    dialog.ShowCustom("Edit Deck", "Cancel", form, window)
+    deckNameEntry.OnSubmitted = func(_ string) { onSubmit() }
+    maxNewCardsEntry.OnSubmitted = func(_ string) { onSubmit() }
+    maxReviewsEntry.OnSubmitted = func(_ string) { onSubmit() }
 }

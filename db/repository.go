@@ -15,7 +15,13 @@ func InsertCard(db *sql.DB, card models.Flashcard) error {
 	}
 
 	insertQuery := "INSERT INTO Cards (Front, Back, EaseFactor, Repetitions, Interval, NextReview, DeckID) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	_, err := db.Exec(insertQuery, card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID)
+	stmt, err := db.Prepare(insertQuery)
+	if err != nil {
+		return fmt.Errorf("failed to prepare insert statement: %v", err)
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(card.Front, card.Back, card.EaseFactor, card.Repetitions, card.Interval, card.NextReview.Format("2006-01-02"), card.DeckID)
 	if err != nil {
 		return fmt.Errorf("failed to insert card: %v", err)
 	}
@@ -30,7 +36,13 @@ func InsertDeck(db *sql.DB, deck models.Deck) error {
 	}
 
 	insertQuery := "INSERT INTO Decks (MaxNewCards, MaxReviewsDaily, Name) VALUES (?, ?, ?)"
-	_, err := db.Exec(insertQuery, deck.MaxNewCards, deck.MaxReviewsDaily, deck.Name)
+	stmt, err := db.Prepare(insertQuery)
+	if err != nil {
+		return fmt.Errorf("failed to prepare insert statement: %v", err)
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(deck.MaxNewCards, deck.MaxReviewsDaily, deck.Name)
 	if err != nil {
 		return fmt.Errorf("failed to insert deck: %v", err)
 	}
@@ -41,17 +53,23 @@ func InsertDeck(db *sql.DB, deck models.Deck) error {
 
 func FetchAllCards(db *sql.DB, deckID int32) ([]models.Flashcard, error) {
 	var cards []models.Flashcard
-	rows, err := db.Query("SELECT * FROM Cards WHERE DeckID = ?", deckID)
+	
+	stmt, err := db.Prepare("SELECT * FROM Cards WHERE DeckID = ?")
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare select statement: %v", err)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(deckID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select cards for deck %d: %v", deckID, err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var card models.Flashcard
 		card, err := scanFlashcardRow(rows)
 		if err != nil {
-			return cards, fmt.Errorf("something went wrong when scanning the cards")
+			return cards, fmt.Errorf("something went wrong when scanning the cards: %v", err)
 		}
 		cards = append(cards, card)
 	}
@@ -65,19 +83,25 @@ func FetchAllCards(db *sql.DB, deckID int32) ([]models.Flashcard, error) {
 
 func FetchAllDecks(db *sql.DB) ([]models.Deck, error) {
 	var decks []models.Deck
-	rows, err := db.Query("SELECT * FROM Decks")
+
+	stmt, err := db.Prepare("SELECT * FROM Decks")
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare select statement: %v", err)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query()
 	if err != nil {
 		return nil, fmt.Errorf("failed to select all decks: %v", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var card models.Deck
-		card, err := scanDeckRow(rows)
+		deck, err := scanDeckRow(rows)
 		if err != nil {
-			return decks, fmt.Errorf("something went wrong when scanning the decks")
+			return decks, fmt.Errorf("something went wrong when scanning the decks: %v", err)
 		}
-		decks = append(decks, card)
+		decks = append(decks, deck)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -89,32 +113,43 @@ func FetchAllDecks(db *sql.DB) ([]models.Deck, error) {
 
 func FetchDeck(db *sql.DB, deckID int) (models.Deck, error) {
 	var deck models.Deck
-	var query, err = db.Query(`SELECT ID, Name, MaxNewCards, MaxReviewsDaily FROM Decks WHERE ID = ? LIMIT 1`, deckID)
-	if err != nil {
-		return deck, fmt.Errorf("there was an error when preparing FetchDeck query: %v", err)
-	}
-	defer query.Close()
 
-	for query.Next() {
-		return scanDeckRow(query)
+	stmt, err := db.Prepare(`SELECT ID, Name, MaxNewCards, MaxReviewsDaily FROM Decks WHERE ID = ? LIMIT 1`)
+	if err != nil {
+		return deck, fmt.Errorf("failed to prepare select statement: %v", err)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(deckID)
+	if err != nil {
+		return deck, fmt.Errorf("error executing query: %v", err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		return scanDeckRow(rows)
 	}
 
 	return models.Deck{}, fmt.Errorf("no deck found with ID: %d", deckID)
 }
 
 func FetchCard(db *sql.DB, cardID int) (models.Flashcard, error) {
-	var card models.Flashcard
-	query, err := db.Query(`SELECT * FROM CARDS WHERE ID = ? LIMIT 1`, cardID)
-
+	stmt, err := db.Prepare(`SELECT * FROM CARDS WHERE ID = ? LIMIT 1`)
 	if err != nil {
-		return card, fmt.Errorf("there was an error in query of fetchard: %v", err)
+		return models.Flashcard{}, fmt.Errorf("failed to prepare select statement: %v", err)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(cardID)
+	if err != nil {
+		return models.Flashcard{}, fmt.Errorf("error executing query: %v", err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		return scanFlashcardRow(rows)
 	}
 
-	defer query.Close()
-
-	for query.Next() {
-		return scanFlashcardRow(query)
-	}
 	return models.Flashcard{}, fmt.Errorf("no card was found with ID %d", cardID)
 }
 
@@ -277,19 +312,25 @@ func UpdateDeckRecord(db *sql.DB, deck models.Deck) error {
 }
 
 func FetchNewCards(db *sql.DB, deckID int32, limit int32) ([]*models.Flashcard, error) {
-	rows, err := db.Query("SELECT * FROM Cards WHERE DeckID = ? AND Repetitions = 0 LIMIT ?", deckID, limit)
+	stmt, err := db.Prepare("SELECT * FROM Cards WHERE DeckID = ? AND Repetitions = 0 LIMIT ?")
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare select statement: %v", err)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(deckID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select new cards for deck %d: %v", deckID, err)
 	}
 	defer rows.Close()
 
-	var cards []*models.Flashcard 
+	var cards []*models.Flashcard
 	for rows.Next() {
 		card, err := scanFlashcardRow(rows)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning card: %v", err)
 		}
-		cards = append(cards, &card) 
+		cards = append(cards, &card)
 	}
 
 	if err = rows.Err(); err != nil {
@@ -301,19 +342,25 @@ func FetchNewCards(db *sql.DB, deckID int32, limit int32) ([]*models.Flashcard, 
 
 func FetchDueCards(db *sql.DB, deckID int32, limit int32) ([]*models.Flashcard, error) {
 	today := time.Now().Format("2006-01-02")
-	rows, err := db.Query("SELECT * FROM Cards WHERE DeckID = ? AND NextReview <= ? LIMIT ?", deckID, today, limit)
+	stmt, err := db.Prepare("SELECT * FROM Cards WHERE DeckID = ? AND NextReview <= ? LIMIT ?")
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare select statement: %v", err)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(deckID, today, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select due cards for deck %d: %v", deckID, err)
 	}
 	defer rows.Close()
 
-	var cards []*models.Flashcard 
+	var cards []*models.Flashcard
 	for rows.Next() {
 		card, err := scanFlashcardRow(rows)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning card: %v", err)
 		}
-		cards = append(cards, &card) 
+		cards = append(cards, &card)
 	}
 
 	if err = rows.Err(); err != nil {
