@@ -14,3 +14,6 @@ Alternative:
 
 When creating new deck, you have to edit to add limit to new and due cards review. 
 10 new cards and 999 due cards(you will never have to actually review so many cards if you make your reviews daily) are a good starting point.
+
+
+If you want to see the weekly progress log, you can open the file ProgressLog.
