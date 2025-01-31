@@ -1,0 +1,102 @@
+This log has been created after the development was finished and it is based on the history of 53 commits to this repository.
+
+
+Week 1: 
+October 17-20:
+Oct 19: Fixed database issues, enabling proper saving of card/deck records. Restructured the file organization and finalized table creation queries.
+Oct 18: Began database development, adjusting structs to align with database requirements.
+Oct 17: Renamed the application, added a README, and made the first commit.
+Started the development
+
+Major Database Enhancements: Implemented significant changes to the database layer, adding update, display, and fetch operations.
+CLI Development Initiated: Introduced a new cmd package, laying the groundwork for a future command-line interface.
+Merge Activity: Merged pull request #5, integrating updates from the master branch.
+
+
+Week 2: 
+Oct 21, 2024 - Beginning of Code Refactoring
+
+    Merged refactored branch into main.
+    Started restructuring code to improve maintainability.
+
+Oct 22, 2024 - Database Organization Improvements
+
+    Separated database initialization and table creation functions into a new file.
+
+Oct 24, 2024 - Query Refinements & More Refactoring
+
+    Added individual queries for Deck and Flashcard retrieval.
+    Refactored FetchCard and FetchDeck functions, moving iteration logic to db_helpers.go.
+
+Oct 26, 2024 - More Query Optimizations
+
+    Further refactored FetchAllCards and FetchAllDecks, improving efficiency.
+    Merged pull request #14, integrating these changes into the master branch.
+
+
+
+
+Week 3: 
+Oct 28, 2024
+
+    Added update record functions to improve data modification capabilities.
+    Implemented DeleteCard function (appears to be duplicated in commit message).
+    Merged pull requests #15 and #16, integrating these changes into the master branch.
+
+Nov 4, 2024
+
+    Added a variety of tests, increasing repository.go test coverage to 45.2%.
+
+
+Week 4: 
+No progress
+
+Week 5: 
+Started implementing the GUI
+
+
+Week 6:
+My Visual Studio Code broke and I lost most of my progress (insert clown emoji)
+The issue was fixed
+
+Week 7: 
+Dec 14, 2024
+
+    Debugged SM2 algorithm, ensuring correct spaced repetition calculations.
+    Merged UI-experiment branch (#21), finalizing a basic UI.
+
+Dec 15, 2024
+
+    Created Queue struct to manage review scheduling.
+    Deleted unused code for cleaner project structure.
+    Started creating the review system, likely integrating it with spaced repetition logic.
+
+Week 8:
+Dec 28, 2024
+
+    Finished implementing the queue, likely for managing review scheduling.
+     queue is not yet functional, but implementation is in progress
+
+
+
+
+Week 9:
+Refactored GUI code: Split the large app_gui file into four separate files within the gui package to improve maintainability.
+Added Deck UI: Now displays the number of new and due cards and includes a back button for navigation.
+
+
+Week 12: 
+Jan 24, 2025
+
+    Refactored CreateDecksUI function to improve maintainability and organization.
+    UI Improvements: Enhanced layout and functionality, making CRUD operations easier.
+    Bug Fixes: Resolved issues related to updating cards.
+
+Jan 25, 2025
+
+    Changed deck overview layout, likely improving usability and readability.
+    Added edit deck functionality, allowing modifications to deck details.
+    Merged pull request #23, integrating these UI changes into the main branch.
+
+
+The project is ready
